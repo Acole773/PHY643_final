@@ -7,6 +7,74 @@
 
 #include "reaction_solver.hpp"
 
+
+std::vector<std::vector<int>> stoich = {
+    // R1: CH4 + OH => CH3 + H2O
+    { -1,  0,  0,  1,  0,  0,  0,  0,  0,  0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0 },
+    // R2: CH4 + H => CH3 + H2
+    { -1,  0,  0,  0,  0,  1,  0, -1,  0,  0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0 },
+    // R3: CH4 + O2 => CH3 + HO2
+    { -1, -1,  0,  0,  0,  0,  0,  0,  0,  1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0 },
+    // R4: CH3 + O2 => CH3OO
+    {  0, -1,  0,  0,  0,  0,  0,  0,  0,  0, -1,  1,  0,  0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0 },
+    // R5: CH3 + HO2 => CH3OOH
+    {  0,  0,  0,  0,  0,  0,  0,  0,  0, -1, -1,  0,  1,  0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0 },
+    // R6: CH3 + OH => CH3OH
+    {  0,  0,  0,  0,  0,  0, -1,  0,  0,  0, -1,  0,  0,  1,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0 },
+    // R7: CH3 + OH => CH2 + H2O
+    {  0,  0,  0,  1,  0,  0, -1,  0,  0,  0, -1,  1,  0,  0,  1,  0,  0,  0,  0,  0, 0, 0, 0, 0 },
+    // R8: CH3OO + H => CH3O + OH
+    {  0,  0,  0,  0,  0,  0,  1, -1,  0,  0,  0, -1,  0,  0,  0,  1,  0,  0,  0,  0, 0, 0, 0, 0 },
+    // R9: CH3OOH + H => CH3O + H2O
+    {  0,  0,  0,  1,  0,  0,  0, -1,  0,  0,  0,  0, -1,  0,  0,  1,  0,  0,  0,  0, 0, 0, 0, 0 },
+    // R10: CH3OH + H => CH3O + H2
+    {  0,  0,  0,  0,  0,  1,  0, -1,  0,  0,  0,  0,  0, -1,  0,  1,  0,  0,  0,  0, 0, 0, 0, 0 },
+    // R11: CH3O + O2 => CH2O + HO2
+    { 0, -1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, -1,  1,  0,  0,  1, 0, 0, 0, 0 },
+    // R12: CH3O + O2 => CH2OH + O2
+    { 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, -1,  0,  0,  1,  0, 0, 0, 0, 1 },
+    // R13: CH3O + H => CH2OH + H2
+    { 0,  0,  0,  0,  0,  1,  0, -1,  0,  0,  0,  0,  0,  0,  0, -1,  0,  0,  1,  0, 0, 0, 0, 0 },
+    // R14: CH3O + H => CH2O + H2
+    { 0,  0,  0,  0,  0,  1,  0, -1,  0,  0,  0,  0,  0,  0,  0, -1,  1,  0,  0,  0, 0, 0, 0, 0 },
+    // R15: CH3O + OH => CH2O + H2O
+    { 0,  0,  0,  1,  0,  0, -1,  0,  0,  0,  0,  0,  0,  0,  0, -1,  1,  0,  0,  0, 0, 0, 0, 0 },
+    // R16: CH2OH + OH => CH2O + H2O
+    { 0,  0,  0,  1,  0,  0, -1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, -1,  1, 0, 0, 0, 0 },
+    // R17: CH2OH + H => CH2O + H2
+    { 0,  0,  0,  0,  0,  1,  0, -1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, -1,  1, 0, 0, 0, 0 },
+    // R18: CH2OH + O => CH2O + OH
+    { 0,  0, -1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, -1,  0, 0, 0, 0, 1 },
+    // R19: CH2OH + O2 => HO2 + CH2O
+    { 0, -1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, -1,  0, 0, 0, 0, 1 },
+    // R20: CH2OH + O2 => HCOOH + H
+    { 0, -1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, -1,  0, 1, 0, 0, 0 },
+    // R21: CH2 + O2 => HCO + OH
+    { 0, -1,  0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, -1,  0,  0,  1,  0,  0, 0, 0, 0, 0 },
+    // R22: CH2 + O2 => CO + H + OH
+    { 0, -1,  0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, -1,  0,  0,  0,  0,  0, 0, 1, 1, 0 },
+    // R23: CH2 + H => CH + H2
+    { 0,  0,  0,  0,  0,  1,  0, -1,  0,  0,  0,  0,  0,  0, -1,  0,  0,  0,  0,  0, 0, 0, 0, 0 },
+    // R24: CH2 + O => CO + H + H
+    { 0,  0, -1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, -1,  0,  0,  0,  0,  0, 0, 1, 2, 0 },
+    // R25: CH2 + OH => CH + H2O
+    { 0,  0,  0,  1,  0,  0, -1,  0,  0,  0,  0,  0,  0,  0, -1,  0,  0,  0,  0,  0, 0, 0, 0, 0 },
+    // R26: CH + OH => CO + H + H
+    { 0,  0,  0,  1,  0,  0, -1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, 0, 1, 2, 0 },
+    // R27: CH + O => CO + H
+    { 0,  0, -1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, 0, 1, 1, 0 },
+    // R28: CH + O2 => CO2 + H
+    { 0, -1,  0,  0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, 0, 1, 0, 0 },
+    // R29: CH2O + OH => HCO + H2O
+    { 0,  0,  0,  1,  0,  0, -1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  0, -1, 0, 0, 0, 0 },
+    // R30: HCO + OH => CO + H2O
+    { 0,  0,  0,  1,  0,  0, -1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, -1,  0,  0, 0, 1, 0, 0 },
+    // R31: HCOOH + OH => HCOO + H2O
+    { 0,  0,  0,  1,  0,  0, -1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, -1, 0, 0, 1},
+    // R32: HCOO + OH => CO2 + H2O
+    { 0,  0,  0,  1,  1,  0, -1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, 0, 0, 0, -1}
+};
+
 const double R = 8.314; // J/mol·K
 const double Tol_c = 1e-4; // Conservation tolerance
 
@@ -110,7 +178,7 @@ void impose_detailed_balance(std::vector<Reaction>& reactions,
     }
 }
 
-double compute_flux(const Reaction& r,
+/* double compute_flux(const Reaction& r,
                     const std::vector<Species>& species,
                     double k_f, double k_b) {
     double forward = k_f;
@@ -123,7 +191,26 @@ double compute_flux(const Reaction& r,
 
 
     return forward - backward;
+}*/
+double compute_flux(const Reaction& r, int i,
+                    const std::vector<Species>& species,
+                    double k_f, double k_b) {
+    double forward = k_f;
+    double backward = k_b;
+
+    for (size_t j = 0; j < species.size(); ++j) {
+        int coeff = stoich[i][j];
+        if (coeff < 0) {  // Reactant
+            forward *= pow(species[j].abundance, -coeff);
+        } else if (coeff > 0) {  // Product
+            backward *= pow(species[j].abundance, coeff);
+        }
+    }
+
+    // Apply rate coefficients (assumed stored in r.kf and r.kb)
+    return r.k_fwd * forward - r.k_rev * backward;
 }
+
 void update_reactions_FE(std::vector<Species>& species,
                          const std::vector<Reaction>& reactions,
                          double dt, double T,
@@ -135,8 +222,8 @@ void update_reactions_RK45(std::vector<Species>& species,
                            double& net_energy,
                            double abs_tol,
                            double rel_tol, 
-			   double dt_min,
-			   double dt_max);
+			               double dt_min,
+			               double dt_max);
 //------------Update_reaction-------------------
 IntegrationMethod parse_method(std::string s) {
     if (s == "FE") return FORWARD_EULER;
@@ -152,8 +239,8 @@ void update_reactions(std::vector<Species>& species,
                       IntegrationMethod method,
                       double abs_tol,
                       double rel_tol,
-		      double dt_min,
-		      double dt_max) {
+		              double dt_min,
+		              double dt_max) {
     switch (method) {
         case FORWARD_EULER:
             update_reactions_FE(species, reactions, dt, T, net_energy);
@@ -162,11 +249,6 @@ void update_reactions(std::vector<Species>& species,
         case RKF45:
             update_reactions_RK45(species, reactions, dt, T, net_energy, abs_tol, rel_tol, dt_min, dt_max);
             break;
-
-        // Future methods:
-        // case ADAPTIVE_IMEX:
-        //     update_reactions_IMEX(species, reactions, dt, T, net_energy, ...);
-        //     break;
 
         default:
             std::cerr << "Unknown integration method!" << std::endl;
@@ -180,13 +262,14 @@ void update_reactions_FE(std::vector<Species>& species,
                       double dt, double T,
                       double& net_energy) {
     net_energy = 0.0;
+    int i = 0;
 
     for (const Reaction& r : reactions) {
         double k_f = r.A_forward * std::pow(T, r.n_forward) * std::exp(-r.Ea_forward / (R * T));
         double k_b = r.A_backward * std::pow(T, r.n_backward) * std::exp(-r.Ea_backward / (R * T));
 
-        double delta = compute_flux(r, species, k_f, k_b) * dt;
-
+        double delta = compute_flux(r, i, species, k_f, k_b) * dt;
+        i++; 
         for (int idx : r.reactants){
 	       	species[idx].abundance -= delta;
 		if (species[idx].abundance < 0) species[idx].abundance = 1e-20;
@@ -268,15 +351,16 @@ void update_reactions_RK45(std::vector<Species>& species,
         // Helper lambda to compute dY/dt
         auto compute_dydt = [&](const std::vector<double>& y) {
             std::vector<double> dydt(species.size(), 0.0);
+            int i = 0;
             for (const auto& r : reactions) {
                 double k_f = r.A_forward * std::pow(T, r.n_forward) * std::exp(-r.Ea_forward / (R * T));
                 double k_b = r.A_backward * std::pow(T, r.n_backward) * std::exp(-r.Ea_backward / (R * T));
-		std::vector<Species> y_temp = species;
-		for (size_t i = 0; i < y_temp.size(); ++i) {
-		    y_temp[i].abundance = y[i];
-		}
-		double flux = compute_flux(r, y_temp, k_f, k_b); // mol/m³/s
-
+		        std::vector<Species> y_temp = species;
+		        for (size_t i = 0; i < y_temp.size(); ++i) {
+		            y_temp[i].abundance = y[i];
+		        }
+		        double flux = compute_flux(r, i, y_temp, k_f, k_b); // mol/m³/s
+                i++;
                 for (int idx : r.reactants) dydt[idx] -= flux;
                 for (int idx : r.products)  dydt[idx] += flux;
             }
@@ -330,10 +414,12 @@ void update_reactions_RK45(std::vector<Species>& species,
             }
 
             // Estimate energy release
+            int i = 0; 
             for (const auto& r : reactions) {
                 double k_f = r.A_forward * std::pow(T, r.n_forward) * std::exp(-r.Ea_forward / (R * T));
                 double k_b = r.A_backward * std::pow(T, r.n_backward) * std::exp(-r.Ea_backward / (R * T));
-                double delta = compute_flux(r, species, k_f, k_b) * dt;
+                double delta = compute_flux(r, i, species, k_f, k_b) * dt;
+                i++;
                 net_energy += delta * r.delta_H;
             }
 
@@ -372,6 +458,7 @@ void check_conservation(const std::vector<Species>& species) {
 
 // ------------------ MAIN DRIVER ------------------
 int main() {
+    //here I initialize the species vector with initial populations, atomic 
     std::vector<Species> species = {
         {"CH4",   1000000000.0, 1, 4, 0, 16.04,  -74870},	//0
         {"O2",    2000000000.0, 0, 0, 2, 32.00,   1e-20},	//1
@@ -398,18 +485,18 @@ int main() {
     std::vector<Reaction> reactions;
     if (!read_reactions("rates32.txt", reactions, species)) return 1;
 
-    double T = 1000.0;
+    double T = 1500.0;
 
-    IntegrationMethod method = RKF45; // or FORWARD_EULER
+    IntegrationMethod method = RKF45; // RKF45 or FORWARD_EULER
 
     double t = 0.0;
-    double t_end = 1.0e-3;
+    double t_end = 1.0e-11;
     double dt = 1.0e-12; // Initial timestep
     double net_energy = 0.0;
     double dt_min = 1e-16, dt_max = 1.0;
     double total_energy = 0.0;
     int step = 0;
-
+    
     double abs_tol = 1e-6;
     double rel_tol = 1e-4;
 
