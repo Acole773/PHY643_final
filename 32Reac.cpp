@@ -31,8 +31,11 @@ struct Reaction {
     double k_fwd, k_rev;
 };
 
+
 // ------------------ FILE READING ------------------
-bool read_reactions(const std::string& filename, std::vector<Reaction>& reactions) {
+bool read_reactions(const std::string& filename,
+                    std::vector<Reaction>& reactions,
+                    const std::vector<Species>& species) {
     std::ifstream file(filename);
     if (!file.is_open()) {
         std::cerr << "Error: Cannot open file " << filename << std::endl;
@@ -40,28 +43,41 @@ bool read_reactions(const std::string& filename, std::vector<Reaction>& reaction
     }
 
     std::string line;
-    while (std::getline(file, line)) {
-        if (line.empty() || line[0] == '#') continue;
+while (std::getline(file, line)) {
+    if (line.empty() || line[0] == '#') continue;
 
-        std::istringstream iss(line);
-        Reaction r;
+    std::istringstream iss(line);
+    Reaction r;
 
-        int num_reactants, num_products;
-        if (!(iss >> num_reactants)) continue;
-        r.reactants.resize(num_reactants);
-        for (int i = 0; i < num_reactants; ++i) iss >> r.reactants[i];
+    int num_reactants, num_products;
+    bool valid = true;
 
-        if (!(iss >> num_products)) continue;
-        r.products.resize(num_products);
-        for (int i = 0; i < num_products; ++i) iss >> r.products[i];
-
-        if (!(iss >> r.A_forward >> r.n_forward >> r.Ea_forward)) continue;
-
-        reactions.push_back(r);
+    if (!(iss >> num_reactants)) continue;
+    r.reactants.resize(num_reactants);
+    for (int i = 0; i < num_reactants; ++i) {
+        if (!(iss >> r.reactants[i])) { valid = false; break; }
+        if (r.reactants[i] < 0 || r.reactants[i] >= species.size()) valid = false;
     }
+
+    if (!(iss >> num_products)) continue;
+    r.products.resize(num_products);
+    for (int i = 0; i < num_products; ++i) {
+        if (!(iss >> r.products[i])) { valid = false; break; }
+        if (r.products[i] < 0 || r.products[i] >= species.size()) valid = false;
+    }
+
+    if (!(iss >> r.A_forward >> r.n_forward >> r.Ea_forward)) continue;
+
+    if (valid) {
+        reactions.push_back(r);
+    } else {
+        std::cerr << "Warning: Skipping invalid reaction due to bad indices.\n";
+    }
+}
 
     return true;
 }
+
 
 // ------------------ KINETIC CORE ------------------
 void impose_detailed_balance(std::vector<Reaction>& reactions,
@@ -104,6 +120,7 @@ double compute_flux(const Reaction& r,
         forward *= species[idx].abundance;
     for (int idx : r.products)
         backward *= species[idx].abundance;
+
 
     return forward - backward;
 }
@@ -164,7 +181,7 @@ void update_reactions_FE(std::vector<Species>& species,
                       double& net_energy) {
     net_energy = 0.0;
 
-    for (const auto& r : reactions) {
+    for (const Reaction& r : reactions) {
         double k_f = r.A_forward * std::pow(T, r.n_forward) * std::exp(-r.Ea_forward / (R * T));
         double k_b = r.A_backward * std::pow(T, r.n_backward) * std::exp(-r.Ea_backward / (R * T));
 
@@ -258,7 +275,7 @@ void update_reactions_RK45(std::vector<Species>& species,
 		for (size_t i = 0; i < y_temp.size(); ++i) {
 		    y_temp[i].abundance = y[i];
 		}
-		double flux = compute_flux(r, y_temp, k_f, k_b);
+		double flux = compute_flux(r, y_temp, k_f, k_b); // mol/m³/s
 
                 for (int idx : r.reactants) dydt[idx] -= flux;
                 for (int idx : r.products)  dydt[idx] += flux;
@@ -356,8 +373,8 @@ void check_conservation(const std::vector<Species>& species) {
 // ------------------ MAIN DRIVER ------------------
 int main() {
     std::vector<Species> species = {
-        {"CH4",   10.0, 1, 4, 0, 16.04,  -74870},	//0
-        {"O2",    20.0, 0, 0, 2, 32.00,   1e-20},	//1
+        {"CH4",   1000000000.0, 1, 4, 0, 16.04,  -74870},	//0
+        {"O2",    2000000000.0, 0, 0, 2, 32.00,   1e-20},	//1
         {"CO2",	 1e-20, 1, 0, 2, 44.01, -393520},	//2
         {"H2O",  1e-20, 0, 2, 1, 18.02, -241820},	//3
         {"CO",   1e-20, 1, 0, 1, 28.01, -110530},	//4
@@ -379,7 +396,7 @@ int main() {
 };
 
     std::vector<Reaction> reactions;
-    if (!read_reactions("rates32.txt", reactions)) return 1;
+    if (!read_reactions("rates32.txt", reactions, species)) return 1;
 
     double T = 1000.0;
 
@@ -387,21 +404,28 @@ int main() {
 
     double t = 0.0;
     double t_end = 1.0e-3;
-    double dt = 1.0e-6; // Initial timestep
+    double dt = 1.0e-12; // Initial timestep
     double net_energy = 0.0;
     double dt_min = 1e-16, dt_max = 1.0;
     double total_energy = 0.0;
     int step = 0;
 
-    double abs_tol = 1e-9;
-    double rel_tol = 1e-6;
+    double abs_tol = 1e-6;
+    double rel_tol = 1e-4;
 
     //bool restep = 0;
     //int sub_step = 0; 
     //int max_restep = 20;  
     //std::vector<Species> trial_species;
 
+    //-------------
+std::cout << "Initial CH4: " << species[0].abundance << ", O2: " << species[1].abundance << "before impose detailed balance" <<std::endl;
+    //-------------
+
     impose_detailed_balance(reactions, species, T);
+
+    std::cout << "Initial CH4: " << species[0].abundance << ", O2: " << species[1].abundance << "after impose detailed balance" <<std::endl;
+
     while (t < t_end) {
 	double dt_actual = std::min(dt, t_end - t); // avoid overshooting
     	update_reactions(species, reactions, dt_actual, T, net_energy, method, abs_tol, rel_tol, dt_min, dt_max);
